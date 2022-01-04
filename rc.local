@@ -1,0 +1,11 @@
+#!/bin/sh -e
+
+# Disable the WLAN wait if you have wired ethernet
+/home/pi/SBCuterie/WaitForLAN.sh
+
+screen -dm -S SBCuterie sh  ./home/pi/SBCuterie/StartSBCuterie.sh &
+
+# Disable this until ready with another reasonable weighing option.
+# Most load cells drift over time and require timing sensitive code. Do not want.
+# screen -dm -S Weighing sh  ./home/pi/SBCuterie/StartWeighing.sh &
+
