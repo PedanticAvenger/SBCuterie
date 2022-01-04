@@ -18,12 +18,7 @@ import datetime
 import smtplib, ssl, email.message  # Keep this in here and add email functions for various notifications.
 import sqlite3
 
-# import gspread
-
-# from oauth2client.client import SignedJwtAssertionCredentials
-
-# Import the circuitpython modules we need
-
+# Local project file imports
 import includes.const as CONST  # Operating Values that may need to be tweaked moved to separate file in includes.
 from includes.AHT20 import AHT20  # Lib for AHT20 sensors
 from includes.grove_i2c_relay_regular import RELAY  # Lib for I2C relays
@@ -251,38 +246,40 @@ def get_sensor_data():
     if hum_check[1] == 0:
         # All sensors agree
         return_hum = hum_check[2]
-        return_temp_code = "Good"
+        return_hum_code = "Good"
     if hum_check[1] == 1:
         # Sensor X Bad
         return_hum = hum_check[2]
-        return_temp_code = "Sensor X Disagrees"
+        return_hum_code = "Sensor X Disagrees"
         sys.stderr.write("Humidity Sensor X disagrees with other two.")
     if hum_check[1] == 2:
         # Sensor Y Bad
         return_hum = hum_check[2]
-        return_temp_code = "Sensor Y Disagrees"
+        return_hum_code = "Sensor Y Disagrees"
         sys.stderr.write("Humidity Sensor Y disagrees with other two.")
     if hum_check[1] == 3:
         # Sensor Z Bad
         return_hum = hum_check[2]
-        return_temp_code = "Sensor Z Disagrees"
+        return_hum_code = "Sensor Z Disagrees"
         sys.stderr.write("Humidity Sensor Z disagrees with other two.")
     if hum_check[1] == 4:
         # No sensors agree
         return_hum = 0
-        return_temp_code = "No Sensors Agree"
+        return_hum_code = "No Sensors Agree"
         sys.stderr.write("None of the Humidity Sensors agree.")
     if hum_check[1] == 5:
         # 2 pair agreement, spread > MAX_DRIFT but average usable
         return_hum = hum_check[2]
-        return_temp_code = "Large Spread"
+        return_hum_code = "Large Spread"
         sys.stderr.write(
             "Range Across All Humidity Sensors exceeds max delta but pairs good."
         )
 
     return (
         last_sensor_read_time,
+        return_temp_code,
         return_temp,
+        return_hum_code,
         return_hum,
     )
 
@@ -390,26 +387,20 @@ except socket.error as e:
 current_time_this_cure = datetime.datetime.now()
 print("Starting SBCuterie at " + time.strftime("%c"))
 send_alert("Picuterie Startup", "System startup triggered at" + time.strftime("%c"))
+
 # Ensure everything is OFF
 last_cool_time = set_device_status("cooling", "OFF")
 last_heat_time = set_device_status("heating", "OFF")
 last_humid_time = set_device_status("humidifier", "OFF")
 last_dehumid_time = set_device_status("dehumidifier", "OFF")
-
 # last_air_pump_off_time = set_device_status("air", "OFF")
 # last_air_pump_on_time = last_air_pump_off_time
-
 cool_status = "OFF"
 heat_status = "OFF"
 humidifier_status = "OFF"
 dehumidifier_status = "OFF"
 # air_pump_status = "OFF"
 
-"""
-# Login to Google Sheets
-logsheet, credentials = login_open_sheet(GDOCS_OAUTH_JSON, GDOCS_SPREADSHEET_NAME)
-last_login_time = time.time()
-"""
 # Read Initial Data
 # In a basic setup system will only be using one batch of settings at a time.
 # This should be replaced with a look into the DB and pull out the active settings.
@@ -434,7 +425,9 @@ last_refresh = time.time()
 # Read Sensors
 (
     last_sensor_read_time,
+    temp_quorum_code,
     chamber_temperature,
+    humidity_quorum_code,
     chamber_humidity,
 ) = get_sensor_data()
 
@@ -493,9 +486,15 @@ while True:
         # Read Sensors
         (
             last_sensor_read_time,
+            temp_quorum_code,
             chamber_temperature,
+            humidity_quorum_code,
             chamber_humidity,
         ) = get_sensor_data()
+
+        # Check for quorum events in temp or humidity.
+        if (temp_quorum_code != "Good") OR (humidity_quorum_code != "Good"):
+            state_change = 1
 
         # Check for PANIC condition
         if (
@@ -626,7 +625,7 @@ while True:
 
         if (
             chamber_humidity >= (CurrentHumiditySetpoint + CurrentHumidityMaxOvershoot)
-            and CONST.HUMIDITY_CONTROL == "YES"
+            and ControlHumidity == "YES"
         ):
 
             # unlikely as humidifier is now on its own timer
@@ -651,7 +650,7 @@ while True:
 
         if (
             chamber_humidity <= (CurrentHumiditySetpoint - CurrentHumidityMaxOvershoot)
-            and CONST.HUMIDITY_CONTROL == "Y"
+            and ControlHumidity == "YES"
         ):
 
             if cool_status == "ON":
@@ -686,17 +685,22 @@ while True:
 
             event = "State:"
             if cool_status == "ON":
-                event = event + "Cooling "
+                event = event + "Cooling, "
             if heat_status == "ON":
-                event = event + "Heating "
+                event = event + "Heating, "
             if humidifier_status == "ON":
-                event = event + "Humidifying "
+                event = event + "Humidifying, "
             if dehumidifier_status == "ON":
-                event = event + "Dehumidifying "
+                event = event + "Dehumidifying, "
             # if air_pump_status == "ON":
             #     event = event + "Flushing "
-
+            event = event + "TempQuorum" + temp_quorum_code + ", "
+            event = event + "HumiQuorum" + humidity_quorum_code + ", "
             write_logs(chamber_temperature, chamber_humidity, event)
+
+            if (temp_quorum_code == "No Sensors Agree") or (humidity_quorum_code == "No Sensors Agree"):
+                body = "Temp Quorum Code is " + temp_quorum_code + "\nHumidity Quorum Code is " + humidity_quorum_code   
+                send_alert("Chamber Environmental Sensors Disagree", body)
 
             state_change = 0
 
