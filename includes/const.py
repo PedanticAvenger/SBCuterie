@@ -4,6 +4,11 @@
 DEBUG_STATUS = False
 I2C_BUS = 7  # Define the system bus to use for I2C transactions, RaspPi is 1, RockPi is 7 for "default" bus
 I2C_MUX_ADDR = 0x70  # I2C address for the I2C multiplexer to switch channels to talk to different components
+ATHX_MUX_ADDR = 0x01  # I2C MUX address for the X channel ATH20
+ATHY_MUX_ADDR = 0x05  # I2C MUX address for the X channel ATH20
+ATHZ_MUX_ADDR = 0x03  # I2C MUX address for the X channel ATH20
+OUT1_MUX_ADDR = 0x00  # I2C MUX address for the first output connector
+OUT2_MUX_ADDR = 0x02  # I2C MUX address for the second  output connector
 RELAY_DEV_ADDRESS = 0x11  # I2C Address for relay module
 # Block below can be adjusted to fit how you have connected things, doesn't have to match this.
 RELAY_NUM = {
