@@ -175,7 +175,7 @@ def get_sensor_data():
     TCA9548.i2c_mux_channel(
         I2CBus=CONST.I2C_BUS,
         multiplexer_addr=CONST.I2C_MUX_ADDR,
-        i2c_channel_setup=1,
+        i2c_channel_setup=CONST.ATHX_MUX_ADDR,
         debug_status=CONST.DEBUG_STATUS,
     )
     sensor_a = AHT20(I2CBusNum=CONST.I2C_BUS)
@@ -185,7 +185,7 @@ def get_sensor_data():
     TCA9548.i2c_mux_channel(
         I2CBus=CONST.I2C_BUS,
         multiplexer_addr=CONST.I2C_MUX_ADDR,
-        i2c_channel_setup=1,
+        i2c_channel_setup=CONST.ATHY_MUX_ADDR,
         debug_status=CONST.DEBUG_STATUS,
     )
     sensor_b = AHT20(I2CBusNum=CONST.I2C_BUS)
@@ -195,7 +195,7 @@ def get_sensor_data():
     TCA9548.i2c_mux_channel(
         I2CBus=CONST.I2C_BUS,
         multiplexer_addr=CONST.I2C_MUX_ADDR,
-        i2c_channel_setup=1,
+        i2c_channel_setup=CONST.ATHZ_MUX_ADDR,
         debug_status=CONST.DEBUG_STATUS,
     )
     sensor_c = AHT20(I2CBusNum=CONST.I2C_BUS)
@@ -493,7 +493,7 @@ while True:
         ) = get_sensor_data()
 
         # Check for quorum events in temp or humidity.
-        if (temp_quorum_code != "Good") OR (humidity_quorum_code != "Good"):
+        if (temp_quorum_code != "Good") or (humidity_quorum_code != "Good"):
             state_change = 1
 
         # Check for PANIC condition
@@ -563,7 +563,7 @@ while True:
 
         if chamber_temperature >= (
             CurrentTempSetPoint + CurrentTempMaxOvershoot
-        ):  # Heat setpoint + acceptable error exceeded - mainly to avoid overshoot
+        ):  # (Heat setpoint + acceptable error) exceeded - Start steps to cool.
 
             # Turn heat off, only if not in dehumidify cycle
             if heat_status == "ON" and dehumidifier_status == "OFF":
@@ -698,8 +698,15 @@ while True:
             event = event + "HumiQuorum" + humidity_quorum_code + ", "
             write_logs(chamber_temperature, chamber_humidity, event)
 
-            if (temp_quorum_code == "No Sensors Agree") or (humidity_quorum_code == "No Sensors Agree"):
-                body = "Temp Quorum Code is " + temp_quorum_code + "\nHumidity Quorum Code is " + humidity_quorum_code   
+            if (temp_quorum_code == "No Sensors Agree") or (
+                humidity_quorum_code == "No Sensors Agree"
+            ):
+                body = (
+                    "Temp Quorum Code is "
+                    + temp_quorum_code
+                    + "\nHumidity Quorum Code is "
+                    + humidity_quorum_code
+                )
                 send_alert("Chamber Environmental Sensors Disagree", body)
 
             state_change = 0
