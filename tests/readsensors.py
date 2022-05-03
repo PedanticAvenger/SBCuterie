@@ -56,5 +56,5 @@ def get_sensor_data():
 
 # Read Sensors
 (x_temp, y_temp, z_temp, x_hum, y_hum, z_hum) = get_sensor_data()
-print("X/Y/Z_temp= ", x_temp, y_temp, z_temp)
-print("X/Y/Z_hum= ", x_hum, y_hum, z_hum)
+print("X/Y/Z_temp= %s/%s/%s" % (x_temp, y_temp, z_temp))
+print("X/Y/Z_hum= %s/%s/%s" % (x_hum, y_hum, z_hum))
