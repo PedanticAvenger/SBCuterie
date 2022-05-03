@@ -1,14 +1,10 @@
 import os
 import sys
 
-# Check our operating environment
-fpath = os.path.join(os.path.dirname(__file__), "modules")
-sys.path.append(fpath)
-print(sys.path)
-
-import modules.const as CONST  # Operating Values that may need to be tweaked moved to separate file in includes.
-from modules.AHT20 import AHT20  # Lib for AHT20 sensors
-import modules.TCA9548A as TCA9548  # Lib for I2C MUX
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+import controller.modules.const as CONST  # Operating Values that may need to be tweaked moved to separate file in includes.
+from controller.modules.AHT20 import AHT20  # Lib for AHT20 sensors
+import controller.modules.TCA9548A as TCA9548  # Lib for I2C MUX
 
 
 def get_sensor_data():
