@@ -1,6 +1,6 @@
-import includes.const as CONST  # Operating Values that may need to be tweaked moved to separate file in includes.
-from includes.AHT20 import AHT20  # Lib for AHT20 sensors
-import includes.TCA9548A as TCA9548  # Lib for I2C MUX
+import modules.const as CONST  # Operating Values that may need to be tweaked moved to separate file in includes.
+from modules.AHT20 import AHT20  # Lib for AHT20 sensors
+import modules.TCA9548A as TCA9548  # Lib for I2C MUX
 
 
 def get_sensor_data():
