@@ -54,7 +54,7 @@ class AHT20:
     def cmd_measure(self):
         # Send the command to measure
         with SMBus(self.I2CBusNum) as i2c_bus:
-            i2c_bus.write_i2c_block_data(AHT20_I2CADDR, 0, AHT20_CMD_MEASURE)
+            i2c_bus.write_i2c_block_data(AHT20_I2CADDR, 0x0, AHT20_CMD_MEASURE)
         time.sleep(0.08)  # Wait 80 ms after measure
         return True
 

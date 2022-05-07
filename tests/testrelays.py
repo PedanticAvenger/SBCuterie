@@ -1,90 +1,13 @@
 import os
 import sys
+import time
 import datetime
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 import controller.modules.const as CONST  # Operating Values that may need to be tweaked moved to separate file in includes.
 from controller.modules.AHT20 import AHT20  # Lib for AHT20 sensors
 import controller.modules.TCA9548A as TCA9548  # Lib for I2C MUX
-
-
-def quorum_check(value_x, value_y, value_z, delta_max):
-    """
-    Quorum Checking function
-    Requires 3 input values and a max allowed delta between sensors as args.
-    Checks all 3 values against each other and max delta to determine if sensor has
-    failed or is way out of agreement with the other two.
-    Returns a "Return Code" and a value.
-    Return Codes:
-    0 - All sensors agree,
-    1 - sensor x out of spec,
-    2 - sensor y out of spec,
-    3 - sensor z out of spec,
-    4 - no sensors agree, you should error out/email/alarm/etc.
-    5 - sensors agree in pairs but spread across all 3 exceeds delta
-    """
-    # Reset values
-    agree_xy = False
-    agree_xz = False
-    agree_yz = False
-
-    x_min = value_x - delta_max
-    x_max = value_x + delta_max
-    y_min = value_y - delta_max
-    y_max = value_y + delta_max
-
-    # Check for agreement between pairs
-    if x_min <= value_y <= x_max:
-        agree_xy = True
-    if x_min <= value_z <= x_max:
-        agree_xz = True
-    if y_min <= value_z <= y_max:
-        agree_yz = True
-
-    # Evaluate if all sensors either disagree or agree
-    if not (agree_xy) and not (agree_xz) and not (agree_yz):
-        val = 0
-        return_val = [4, val]
-        return return_val  # Set this to return error code stating none of the sensors agree
-
-    if agree_xy and agree_xz and agree_yz:
-        val = (value_x + value_y + value_z) / 3
-        val = round(val, 1)
-        return_val = [0, val]
-        return (
-            return_val  # Set this to return all good code and average of all 3 sensors
-        )
-
-    # Catch edge case of agreement between two separate pairs but not the third.
-    # For this case also return an average of all 3.
-    if (
-        (agree_xy and agree_yz and not agree_xz)
-        or (agree_yz and agree_xz and not agree_xy)
-        or (agree_xy and agree_xz and not agree_yz)
-    ):
-        val = (value_x + value_y + value_z) / 3
-        val = round(val, 1)
-        return_val = [5, val]
-        return return_val  # Set this to return all large spread code and average of all 3 sensors
-
-    # If we flow through all the previous checks, identify which sensor is out of line with quorum.
-    if agree_xy and not agree_yz and not agree_xz:
-        val = (value_x + value_y) / 2
-        val = round(val, 1)
-        return_val = [3, val]
-        return return_val  # Set this to return one bad sensor code for sensor z and average of 2 remaining sensors
-
-    if not agree_xy and agree_yz and not agree_xz:
-        val = (value_y + value_z) / 2
-        val = round(val, 1)
-        return_val = [1, val]
-        return return_val  # Set this to return one bad sensor code for sensor x and average of 2 remaining sensors
-
-    if not agree_xy and not agree_yz and agree_xz:
-        val = (value_x + value_z) / 2
-        val = round(val, 1)
-        return_val = [2, val]
-        return return_val  # Set this to return one bad sensor code for sensor y and average of 2 remaining sensors
+from controller.modules.grove_i2c_relay_regular import RELAY  # Lib for I2C relays
 
 
 def get_sensor_data():
@@ -210,30 +133,69 @@ def get_sensor_data():
     )
 
 
-# Read Sensors
-(
-    last_sensor_read_time,
-    read_temp_code,
-    read_temp,
-    read_hum_code,
-    read_hum,
-) = get_sensor_data()
+def set_device_status(device, setting):
+    """
+    This function sets the relay status for the appropriate device.
+    Uses globals for the appropriate I2C addresses and values to
+    reference the appropriate relay.
+    Devices:
+        heating
+        cooling
+        humidifier
+        dehumidifier
+        *air (This one may live off a GPIO pin but is sidelined until I decide if I actually need it)
 
-print(
-    "Temp Quorum is "
-    + str(read_temp)
-    + " degrees with code '"
-    + str(read_temp_code)
-    + "' at "
-    + str(last_sensor_read_time)
-    + "."
-)
-print(
-    "Humidity Quorum is "
-    + str(read_hum)
-    + "% with code '"
-    + str(read_hum_code)
-    + "' at "
-    + str(last_sensor_read_time)
-    + "."
-)
+    Settings:
+        ON
+        OFF
+    """
+    TCA9548.i2c_mux_channel(
+        I2CBus=CONST.I2C_BUS,
+        multiplexer_addr=CONST.I2C_MUX_ADDR,
+        i2c_channel_setup=CONST.OUT1_MUX_CHAN,  # Assume by default the relays are plugged into the first output port
+        debug_status=CONST.DEBUG_STATUS,
+    )
+    relay = RELAY(
+        i2cbus=CONST.I2C_BUS,
+        device_address=CONST.RELAY_DEV_ADDRESS,
+        num_relays=4,
+        debug_action=CONST.DEBUG_STATUS,
+    )
+
+    if setting == "ON":
+        relay.channel_on(CONST.RELAY_NUM[device])
+
+    if setting == "OFF":
+        relay.channel_off(CONST.RELAY_NUM[device])
+
+    if CONST.DEBUG_STATUS:
+        print("Set " + device + " status to " + setting + " at " + time.strftime("%c"))
+
+    return time.time()
+
+
+# Toggle Through Relays
+time1 = set_device_status("heating", "ON")
+time.sleep(3)
+print(time1)
+time1 = set_device_status("heating", "OFF")
+time.sleep(1)
+print(time1)
+time1 = set_device_status("cooling", "ON")
+time.sleep(3)
+print(time1)
+time1 = set_device_status("cooling", "OFF")
+time.sleep(1)
+print(time1)
+time1 = set_device_status("humidifier", "ON")
+time.sleep(3)
+print(time1)
+time1 = set_device_status("humidifier", "OFF")
+time.sleep(1)
+print(time1)
+time1 = set_device_status("dehumidifier", "ON")
+time.sleep(3)
+print(time1)
+time1 = set_device_status("dehumidifier", "OFF")
+time.sleep(1)
+print(time1)

@@ -101,9 +101,9 @@ def quorum_check(value_x, value_y, value_z, delta_max):
     Returns a "Return Code" and a value.
     Return Codes:
     0 - All sensors agree,
-    1 - sensor x bad,
-    2 - sensor y bad
-    3 - sensor z bad,
+    1 - sensor x out of spec,
+    2 - sensor y out of spec,
+    3 - sensor z out of spec,
     4 - no sensors agree, you should error out/email/alarm/etc.
     5 - sensors agree in pairs but spread across all 3 exceeds delta
     """
@@ -112,22 +112,28 @@ def quorum_check(value_x, value_y, value_z, delta_max):
     agree_xz = False
     agree_yz = False
 
+    x_min = value_x - delta_max
+    x_max = value_x + delta_max
+    y_min = value_y - delta_max
+    y_max = value_y + delta_max
+
     # Check for agreement between pairs
-    if (value_x - delta_max) <= value_y <= (value_x + delta_max):
+    if x_min <= value_y <= x_max:
         agree_xy = True
-    if (value_x - delta_max) <= value_z <= (value_x + delta_max):
+    if x_min <= value_z <= x_max:
         agree_xz = True
-    if (value_y - delta_max) <= value_z <= (value_y + delta_max):
+    if y_min <= value_z <= y_max:
         agree_yz = True
 
     # Evaluate if all sensors either disagree or agree
-    if ~agree_xy and ~agree_xz and ~agree_yz:
+    if not (agree_xy) and not (agree_xz) and not (agree_yz):
         val = 0
         return_val = [4, val]
-        return False  # Set this to return error code stating none of the sensors agree
+        return return_val  # Set this to return error code stating none of the sensors agree
 
     if agree_xy and agree_xz and agree_yz:
         val = (value_x + value_y + value_z) / 3
+        val = round(val, 1)
         return_val = [0, val]
         return (
             return_val  # Set this to return all good code and average of all 3 sensors
@@ -136,27 +142,31 @@ def quorum_check(value_x, value_y, value_z, delta_max):
     # Catch edge case of agreement between two separate pairs but not the third.
     # For this case also return an average of all 3.
     if (
-        (agree_xy and agree_yz and ~agree_xz)
-        or (agree_yz and agree_xz and ~agree_xy)
-        or (agree_xy and agree_xz and ~agree_yz)
+        (agree_xy and agree_yz and not agree_xz)
+        or (agree_yz and agree_xz and not agree_xy)
+        or (agree_xy and agree_xz and not agree_yz)
     ):
         val = (value_x + value_y + value_z) / 3
+        val = round(val, 1)
         return_val = [5, val]
         return return_val  # Set this to return all large spread code and average of all 3 sensors
 
     # If we flow through all the previous checks, identify which sensor is out of line with quorum.
-    if agree_xy and ~agree_yz and ~agree_xz:
+    if agree_xy and not agree_yz and not agree_xz:
         val = (value_x + value_y) / 2
+        val = round(val, 1)
         return_val = [3, val]
         return return_val  # Set this to return one bad sensor code for sensor z and average of 2 remaining sensors
 
-    if ~agree_xy and agree_yz and ~agree_xz:
+    if not agree_xy and agree_yz and not agree_xz:
         val = (value_y + value_z) / 2
+        val = round(val, 1)
         return_val = [1, val]
         return return_val  # Set this to return one bad sensor code for sensor x and average of 2 remaining sensors
 
-    if ~agree_xy and ~agree_yz and agree_xz:
+    if not agree_xy and not agree_yz and agree_xz:
         val = (value_x + value_z) / 2
+        val = round(val, 1)
         return_val = [2, val]
         return return_val  # Set this to return one bad sensor code for sensor y and average of 2 remaining sensors
 
@@ -175,32 +185,32 @@ def get_sensor_data():
     TCA9548.i2c_mux_channel(
         I2CBus=CONST.I2C_BUS,
         multiplexer_addr=CONST.I2C_MUX_ADDR,
-        i2c_channel_setup=CONST.ATHX_MUX_ADDR,
+        i2c_channel_setup=CONST.AHTX_MUX_CHAN,
         debug_status=CONST.DEBUG_STATUS,
     )
     sensor_a = AHT20(I2CBusNum=CONST.I2C_BUS)
-    sensor_a_hum = sensor_a.get_humidity
-    sensor_a_temp = sensor_a.get_temperature
+    sensor_a_hum = sensor_a.get_humidity()
+    sensor_a_temp = sensor_a.get_temperature()
 
     TCA9548.i2c_mux_channel(
         I2CBus=CONST.I2C_BUS,
         multiplexer_addr=CONST.I2C_MUX_ADDR,
-        i2c_channel_setup=CONST.ATHY_MUX_ADDR,
+        i2c_channel_setup=CONST.AHTY_MUX_CHAN,
         debug_status=CONST.DEBUG_STATUS,
     )
     sensor_b = AHT20(I2CBusNum=CONST.I2C_BUS)
-    sensor_b_hum = sensor_b.get_humidity
-    sensor_b_temp = sensor_b.get_temperature
+    sensor_b_hum = sensor_b.get_humidity()
+    sensor_b_temp = sensor_b.get_temperature()
 
     TCA9548.i2c_mux_channel(
         I2CBus=CONST.I2C_BUS,
         multiplexer_addr=CONST.I2C_MUX_ADDR,
-        i2c_channel_setup=CONST.ATHZ_MUX_ADDR,
+        i2c_channel_setup=CONST.AHTZ_MUX_CHAN,
         debug_status=CONST.DEBUG_STATUS,
     )
     sensor_c = AHT20(I2CBusNum=CONST.I2C_BUS)
-    sensor_c_hum = sensor_c.get_humidity
-    sensor_c_temp = sensor_c.get_temperature
+    sensor_c_hum = sensor_c.get_humidity()
+    sensor_c_temp = sensor_c.get_temperature()
 
     last_sensor_read_time = datetime.datetime.now()
 
@@ -211,65 +221,65 @@ def get_sensor_data():
         sensor_a_hum, sensor_b_hum, sensor_c_hum, CONST.MAX_HUMI_SENSOR_DRIFT
     )
 
-    if temp_check[1] == 0:
+    if temp_check[0] == 0:
         # All sensors agree
-        return_temp = temp_check[2]
+        return_temp = temp_check[1]
         return_temp_code = "Good"
-    if temp_check[1] == 1:
+    if temp_check[0] == 1:
         # Sensor X Bad
-        return_temp = temp_check[2]
+        return_temp = temp_check[1]
         return_temp_code = "Sensor X Disagrees"
         sys.stderr.write("Temperature Sensor X disagrees with other two.")
-    if temp_check[1] == 2:
+    if temp_check[0] == 2:
         # Sensor Y Bad
-        return_temp = temp_check[2]
+        return_temp = temp_check[1]
         return_temp_code = "Sensor Y Disagrees"
         sys.stderr.write("Temperature Sensor Y disagrees with other two.")
-    if temp_check[1] == 3:
+    if temp_check[0] == 3:
         # Sensor Z Bad
-        return_temp = temp_check[2]
+        return_temp = temp_check[1]
         return_temp_code = "Sensor Z Disagrees"
         sys.stderr.write("Temperature Sensor Z disagrees with other two.")
-    if temp_check[1] == 4:
+    if temp_check[0] == 4:
         # No sensors agree
         return_temp = 0
         return_temp_code = "No Sensors Agree"
         sys.stderr.write("None of the Termperature Sensors agree.")
-    if temp_check[1] == 5:
+    if temp_check[0] == 5:
         # 2 pair agreement, spread > MAX_DRIFT but average usable
-        return_temp = temp_check[2]
+        return_temp = temp_check[1]
         return_temp_code = "Large Spread"
         sys.stderr.write(
             "Range Across All Temperature Sensors exceeds max delta but pairs good."
         )
 
-    if hum_check[1] == 0:
+    if hum_check[0] == 0:
         # All sensors agree
-        return_hum = hum_check[2]
+        return_hum = hum_check[1]
         return_hum_code = "Good"
-    if hum_check[1] == 1:
+    if hum_check[0] == 1:
         # Sensor X Bad
-        return_hum = hum_check[2]
+        return_hum = hum_check[1]
         return_hum_code = "Sensor X Disagrees"
         sys.stderr.write("Humidity Sensor X disagrees with other two.")
-    if hum_check[1] == 2:
+    if hum_check[0] == 2:
         # Sensor Y Bad
-        return_hum = hum_check[2]
+        return_hum = hum_check[1]
         return_hum_code = "Sensor Y Disagrees"
         sys.stderr.write("Humidity Sensor Y disagrees with other two.")
-    if hum_check[1] == 3:
+    if hum_check[0] == 3:
         # Sensor Z Bad
-        return_hum = hum_check[2]
+        return_hum = hum_check[1]
         return_hum_code = "Sensor Z Disagrees"
         sys.stderr.write("Humidity Sensor Z disagrees with other two.")
-    if hum_check[1] == 4:
+    if hum_check[0] == 4:
         # No sensors agree
         return_hum = 0
         return_hum_code = "No Sensors Agree"
         sys.stderr.write("None of the Humidity Sensors agree.")
-    if hum_check[1] == 5:
+    if hum_check[0] == 5:
         # 2 pair agreement, spread > MAX_DRIFT but average usable
-        return_hum = hum_check[2]
+        return_hum = hum_check[1]
         return_hum_code = "Large Spread"
         sys.stderr.write(
             "Range Across All Humidity Sensors exceeds max delta but pairs good."
