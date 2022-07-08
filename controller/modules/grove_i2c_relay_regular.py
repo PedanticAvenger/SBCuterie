@@ -45,8 +45,6 @@ class RELAY:
         self.NUM_RELAY_PORTS = num_relays  # 4 or 8 are really the only allowed numbers
         self.channel_state = 0x00
 
-        print("Initializing relay board at 0x{:x}".format(self.DEVICE_ADDRESS))
-
         if debug_action:
             print("Enabling action_output mode")
 
